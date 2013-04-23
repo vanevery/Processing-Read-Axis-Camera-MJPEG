@@ -9,6 +9,8 @@ import java.net.PasswordAuthentication;
 import java.net.URL;
 import java.awt.image.PixelGrabber; 
 
+import java.lang.reflect.Method;
+
 // This generates an error that I am ignoring:
 // http://thillakan-tech.blogspot.com/2009/09/eclipse-error-access-restrictionthe.html
 import com.sun.image.codec.jpeg.JPEGImageDecoder;
@@ -17,6 +19,8 @@ import com.sun.image.codec.jpeg.JPEGCodec;
 public class MJPEGParser implements Runnable {
 
   PApplet sketch;
+  
+  Method newFrameMethod;
   
   BufferedImage bimage;
   PImage pimage;
@@ -40,6 +44,12 @@ public class MJPEGParser implements Runnable {
   {
     sketch = _sketch;
     
+    try {
+      newFrameMethod = _sketch.getClass().getMethod("newFrame", new Class[] { PImage.class });
+    } catch (Exception e) {
+      // no such method, or an error.. which is fine, just ignore
+    }
+    
     username = _username;
     password = _password;
     mJpegUrl = _mJpegUrl;
@@ -47,14 +57,14 @@ public class MJPEGParser implements Runnable {
     w = _width;
     h = _height;
     
-    pimage = new PImage(_width, _height);
+    pimage = sketch.createImage(_width,_height,PConstants.RGB);//new PImage(_width, _height);
 
     Thread myThread = new Thread(this);
     myThread.start();
   }
   
   public PImage getPImage() {
-      return pimage;
+      return pimage.get();
   }
   
   public void run() {
@@ -92,12 +102,22 @@ public class MJPEGParser implements Runnable {
       bimage = decoder.decodeAsBufferedImage();
       
       pimage.loadPixels();
-      
-      PixelGrabber pg = new PixelGrabber(bimage,0,0,w,h,pimage.pixels,0,w);
-      pg.grabPixels();
+      synchronized(pimage.pixels) {
+        PixelGrabber pg = new PixelGrabber(bimage, 0, 0, w, h, pimage.pixels, 0, w);
+        pg.grabPixels();
+      }
       
       pimage.updatePixels();      
       
+      if (newFrameMethod != null) {
+        try {
+          newFrameMethod.invoke(sketch, new Object[] { pimage.get() });
+        } catch (Exception e) {
+          newFrameMethod = null;
+          e.printStackTrace();
+        }        
+      }
+
       //System.out.println("Decoded Image: " + bimage.getWidth() + " " + bimage.getHeight());
       //System.gc();
     } catch (Exception e) {
