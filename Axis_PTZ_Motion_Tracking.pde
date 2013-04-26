@@ -1,10 +1,44 @@
+// Try :
+//http://opentsps.com/
 
 MJPEGParser parser;
 PImage currentFrame;
 PImage lastFrame;
 PImage drawFrame;
 
-int changeAmount = 200;
+int changeAmount = 45;
+
+String axisCamControlUrl = "http://root:streamme@128.122.151.228/axis-cgi/com/ptz.cgi?speed=50&move=";
+//http://root:interact@128.122.151.53/axis-cgi/com/ptz.cgi?center=0,0 Center on a point
+//http://root:interact@128.122.151.53/axis-cgi/com/ptz.cgi?move=home Move to home position
+
+public static final int LEFT = 1;
+public static final int CENTER = 2;
+public static final int RIGHT = 3;
+
+public static final String LEFT_STRING = "left";
+public static final String CENTER_STRING = "home";
+public static final String RIGHT_STRING = "right";
+
+int currentRegion = CENTER;
+
+void moveCamera(int region) 
+{
+  String regionString = CENTER_STRING;
+  
+  if (region == LEFT) 
+  {
+    regionString = LEFT_STRING;
+  }
+  else if (region == RIGHT) 
+  {
+    regionString = RIGHT_STRING;
+  }
+  
+  String axisCamRequest = axisCamControlUrl + regionString;
+  loadStrings(axisCamRequest);
+  currentRegion = region;
+}
 
 void setup() {
   size(800,450);
@@ -12,11 +46,19 @@ void setup() {
   //MJPEGParser parser = new MJPEGParser("http://128.122.151.228/mjpg/video.mjpg", "root", "streamme", "--myboundary", this);
   parser = new MJPEGParser("http://128.122.151.228/mjpg/video.mjpg", 800, 450, "root", "streamme", this); 
   
+  moveCamera(CENTER);
   drawFrame = createImage(800,450,RGB);
   
 }
 
+
+    int leftTotal = 0;
+    int rightTotal = 0;
+    int centerTotal = 0;
+    int numFrames = 0;
+    
 void newFrame(PImage newPimage) {
+  
   if (currentFrame != null) {
     lastFrame = currentFrame;
   }
@@ -24,7 +66,10 @@ void newFrame(PImage newPimage) {
   currentFrame = newPimage;
   
   if (lastFrame != null && currentFrame != null) {
+  
 
+    
+    
     lastFrame.loadPixels();
     currentFrame.loadPixels();
     
@@ -44,9 +89,18 @@ void newFrame(PImage newPimage) {
         float diff = dist(r,g,b,pr,pg,pb);
       
         //print(pr + "-" + r + " = " + (pr - r) + "\t");
-        if (diff > mouseX) {
+        if (diff > changeAmount) {
         //if ((abs(pr - r) + abs(pg - g) + abs(pb - b)) > changeAmount) {
         
+          int pp = p % currentFrame.width;
+          if (pp < currentFrame.width/3) {
+           leftTotal++; 
+          } else if (pp < currentFrame.width/3 * 2) {
+            centerTotal++;
+          } else {
+            rightTotal++;
+          }
+          
           drawFrame.pixels[p] = color(0,0,255);  
           //print("" + (abs(pr - r) + abs(pg - g) + abs(pb - b)));
         
@@ -59,24 +113,33 @@ void newFrame(PImage newPimage) {
     }
   }
 
-  println(mouseX);
-  drawFrame.updatePixels();  
+  //println(mouseX);
+  drawFrame.updatePixels();
+  numFrames++;
+  
+  if (numFrames == 30) {
+    
+  if (leftTotal > centerTotal && leftTotal > rightTotal) {
+     if (currentRegion > LEFT) {
+       moveCamera(currentRegion-1);
+     }
+  } else if (rightTotal > centerTotal && rightTotal > leftTotal) {
+    if (currentRegion < RIGHT) {
+      moveCamera(currentRegion+1);
+    }
+  }
+  }
+  // skip 10 frames
+  if (numFrames > 50) {
+     numFrames = 0;
+    leftTotal = 0;
+    rightTotal = 0;
+     centerTotal = 0;
+  }
+  
 }
 
 void draw() {
-  
-  //if (currentFrame != null) {
-    //synchronized (currentFrame.pixels) {
-    //  lastFrame = currentFrame.get();
-      //lastFrame.copy(currentFrame, 0, 0, currentFrame.width, currentFrame.height, 0, 0, currentFrame.width, currentFrame.height);
-      //lastFrame.updatePixels();
-      
-    //}
-  //}
-  
-  //println(currentFrame +  " " + lastFrame);
-  
-  //currentFrame = parser.getPImage();
   
   if (drawFrame != null) {
     image(drawFrame,0,0);
